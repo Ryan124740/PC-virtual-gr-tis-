@@ -1,4 +1,4 @@
-name: PC Virtual — i7 + RTX 3060
+name: PC Virtual Gamer
 
 on:
   workflow_dispatch:
@@ -13,40 +13,32 @@ jobs:
         run: |
           sudo apt update -y
           sudo apt install -y qemu-system-x86 qemu-img
-          qemu-system-x86_64 --version
 
-      - name: Criar Disco de 512GB
+      - name: Criar Disco 512GB
         run: |
-          qemu-img create -f qcow2 pc-gamer-512gb.qcow2 512G
-          ls -lh pc-gamer-512gb.qcow2
+          qemu-img create -f qcow2 pc-gamer.qcow2 512G
+          ls -lh
 
-      - name: Salvar Configurações
+      - name: Salvar Config
         run: |
           cat > config.txt << 'EOF'
-╔══════════════════════════════════════════════════════╗
-║          🖥️  PC VIRTUAL GAMER — ESPECIFICAÇÕES         ║
-╠══════════════════════════════════════════════════════╣
-║  🧠 Placa-mãe: ASUS ROG STRIX Z790-A WiFi            ║
-║  ⚙️ CPU: Intel i7-14700K — 8P+8E / 24 threads        ║
-║  📝 RAM: 16GB DDR5 5600MHz Dual Channel              ║
-║  💾 SSD: 512GB NVMe — Kingston KC3000               ║
-║  🎮 GPU: NVIDIA RTX 3060 — 12GB GDDR6               ║
-║  🔌 Fonte: MSI MAG 650W 80+ Bronze                   ║
-║  ❄️ Cooler: DeepCool AK400 + 6x ARGB fans            ║
-║  🌐 Rede: 2.5Gbps + Wi-Fi 6E + BT 5.3                ║
-║  🔊 Áudio: Realtek ALC4080 — 7.1 canais              ║
-╠══════════════════════════════════════════════════════╣
-║  COMANDO DE INÍCIO:                                   ║
-║  qemu-system-x86_64 -m 16384 -smp 8 -enable-kvm     ║
-║    -hda pc-gamer-512gb.qcow2 -vga virtio             ║
-║    -net user -soundhw hda                            ║
-╚══════════════════════════════════════════════════════╝
+PC VIRTUAL GAMER
+=================
+Placa-mae: ASUS Z790-A
+CPU: i7-14700K
+RAM: 16GB DDR5
+SSD: 512GB NVMe
+GPU: RTX 3060 12GB
+Fonte: 650W 80+ Bronze
 EOF
           cat config.txt
 
       - name: Baixar Arquivos
         uses: actions/upload-artifact@v4
         with:
-          name: PC-Virtual-Gamer
-          path: "*.qcow2, *.txt"
-          retention-days: 14
+          name: PC-Gamer-Arquivos
+          path: |
+            *.qcow2
+            *.txt
+          retention-days: 7
+          
