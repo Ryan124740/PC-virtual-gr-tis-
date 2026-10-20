@@ -13,6 +13,7 @@ jobs:
         run: |
           sudo apt update -y
           sudo apt install -y qemu-system-x86 qemu-img
+          qemu-system-x86_64 --version
 
       - name: Criar Disco 512GB
         run: |
