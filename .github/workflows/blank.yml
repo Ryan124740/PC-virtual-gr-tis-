@@ -9,33 +9,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Instalar QEMU
-        run: |
-          sudo apt update -y
-          sudo apt install -y qemu-system-x86 qemu-img
-
-      - name: Criar Disco
-        run: |
-          qemu-img create -f qcow2 pc-gamer.qcow2 512G
-          ls -lh
-
-      - name: Salvar Config
-        run: |
-          echo "PC VIRTUAL GAMER" > config.txt
-          echo "Placa-mae: ASUS Z790-A" >> config.txt
-          echo "CPU: i7-14700K" >> config.txt
-          echo "RAM: 16GB DDR5" >> config.txt
-          echo "SSD: 512GB NVMe" >> config.txt
-          echo "GPU: RTX 3060 12GB" >> config.txt
-          echo "Fonte: 650W 80+ Bronze" >> config.txt
-          cat config.txt
-
-      - name: Baixar Arquivos
-        uses: actions/upload-artifact@v4
-        with:
-          name: PC-Gamer-Arquivos
-          path: |
-            *.qcow2
-            *.txt
-          retention-days: 7
-          
+      - name: Olá Mundo
+        run: echo "Deu certo! ✅"
+        
