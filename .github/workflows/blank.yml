@@ -1,0 +1,349 @@
+name: 🖥️ PC Virtual Completo — i7-14ª + RTX 3060
+run-name: 🔧 Criando: ${{ github.event.inputs.vm_name }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      vm_name:
+        description: 'Nome do seu PC Virtual'
+        required: false
+        default: 'Gamer-Station-Virtual'
+      cpu_cores:
+        description: 'Núcleos de CPU'
+        required: false
+        default: '8'
+      ram_size:
+        description: 'RAM em MB — 16GB = 16384'
+        required: false
+        default: '16384'
+      disk_size:
+        description: 'SSD em GB'
+        required: false
+        default: '512'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-full-pc:
+    name: 🛠️ Montar PC Completo
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: 📥 Preparando ambiente
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Instalando QEMU e ferramentas
+        run: |
+          sudo apt-get update -qq && sudo apt-get upgrade -y -qq
+          sudo apt-get install -y -qq \
+            qemu-system-x86 qemu-img qemu-kvm \
+            ovmf edk2-utils virt-manager bridge-utils
+          qemu-system-x86_64 --version
+
+      - name: 💿 Criando SSD NVMe Virtual
+        run: |
+          VM_NAME="${{ github.event.inputs.vm_name || 'Gamer-Station-Virtual' }}"
+          DISK_SIZE="${{ github.event.inputs.disk_size || '512' }}"
+          DISK_FILE="${VM_NAME// /_}-512GB-NVMe.qcow2"
+          qemu-img create -f qcow2 -o preallocation=metadata,cluster_size=65536 "$DISK_FILE" "${DISK_SIZE}G"
+          ls -lh "$DISK_FILE"
+          echo "DISK_FILE=$DISK_FILE" >> $GITHUB_ENV
+
+      - name: 🎮 Gerando Script de Inicialização COMPLETO
+        run: |
+          VM_NAME="${{ github.event.inputs.vm_name || 'Gamer-Station-Virtual' }}"
+          CPU_CORES="${{ github.event.inputs.cpu_cores || '8' }}"
+          RAM_SIZE="${{ github.event.inputs.ram_size || '16384' }}"
+          DISK_FILE="${{ env.DISK_FILE }}"
+          
+          cat > iniciar-pc-completo.sh << 'ENDSCRIPT'
+#!/bin/bash
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║               🖥️  PC VIRTUAL — ESPECIFICAÇÕES COMPLETAS               ║
+# ╠══════════════════════════════════════════════════════════════════╣
+# ║                                                                      ║
+# ║  📌 PLACA-MÃE                                                       ║
+# ║  Modelo:         ASUS ROG STRIX Z790-A GAMING WIFI D4              ║
+# ║  Chipset:        Intel Z790 — LGA 1700                              ║
+# ║  Formato:        ATX (305 x 244 mm)                                 ║
+# ║  BIOS:           UEFI AMI — Secure Boot ativado                    ║
+# ║  Slots RAM:      4 x DDR5 — até 128GB total                         ║
+# ║  Armazenamento:  4 x M.2 NVMe + 6 x SATA III                       ║
+# ║  Rede:           Wi-Fi 6E AX211 + Ethernet 2.5Gbps Realtek          ║
+# ║  Áudio:          Realtek ALC4080 — 7.1 canais + DAC                ║
+# ║  USB:            4x USB 3.2 Gen 2, 2x USB-C 3.2 Gen 2x2, 4x 2.0   ║
+# ║  Iluminação:     Aura Sync RGB — endereçável                        ║
+# ║                                                                      ║
+# ║  ⚙️  PROCESSADOR                                                     ║
+# ║  Modelo:         Intel Core i7-14700K — 14ª Geração                 ║
+# ║  Arquitetura:    Raptor Lake Refresh — 10nm Intel 7                 ║
+# ║  Núcleos:        8 Performance + 8 Efficient = 16 núcleos no total  ║
+# ║  Threads:        24 threads lógicos                                  ║
+# ║  Frequência:     3.4GHz Base / 5.4GHz Turbo Max                     ║
+# ║  Cache:          33MB Intel Smart Cache                             ║
+# ║  TDP:            125W Base / 253W Turbo                            ║
+# ║  Soquete:        LGA 1700                                            ║
+# ║  Suporte:        Instruções AVX2, AVX-512, VT-x, VT-d               ║
+# ║                                                                      ║
+# ║  📝 MEMÓRIA RAM                                                      ║
+# ║  Capacidade:     16GB (2 x 8GB) DDR5 5600MHz                        ║
+# ║  Marca/Modelo:   Kingston Fury Beast RGB — Dual Channel             ║
+# ║  Latência:       CL36                                                ║
+# ║  Expansão:       4 slots livres — até 128GB total                   ║
+# ║                                                                      ║
+# ║  💾 ARMAZENAMENTO                                                    ║
+# ║  SSD Principal:  Kingston KC3000 512GB NVMe PCIe 4.0 x4             ║
+# ║  Controlador:    Phison PS5018-E18                                   ║
+# ║  Leitura:        até 7000 MB/s                                       ║
+# ║  Gravação:       até 3900 MB/s                                       ║
+# ║  Cache SLC:      1GB DRAM onboard                                    ║
+# ║  TBW:            400 Terabytes Written                               ║
+# ║                                                                      ║
+# ║  🎮 PLACA DE VÍDEO                                                   ║
+# ║  Modelo:         NVIDIA GeForce RTX 3060 — 12GB GDDR6               ║
+# ║  Arquitetura:    Ampere — 8nm Samsung                                ║
+# ║  CUDA Cores:     3584 núcleos CUDA                                   ║
+# ║  Frequência:     1320MHz Base / 1777MHz Boost                       ║
+# ║  Memória:        12GB GDDR6 — 192-bit — 360 GB/s                    ║
+# ║  Recursos:       Ray Tracing Cores 2ª gen • Tensor Cores 3ª gen      ║
+# ║  Saídas:         3x DisplayPort 1.4a • 1x HDMI 2.1                  ║
+# ║  Consumo:        170W TDP — Recomendado 550W+ fonte                 ║
+# ║                                                                      ║
+# ║  🔌 FONTE DE ALIMENTAÇÃO                                            ║
+# ║  Modelo:         MSI MAG A650BN — 650W 80+ Bronze                   ║
+# ║  Certificação:   80 PLUS Bronze — 85% eficiência                    ║
+# ║  Modular:        Cabos principais fixos, restante modular           ║
+# ║  Proteções:      OVP, OCP, UVP, OPP, SCP, OTP                       ║
+# ║  Ventoinha:      120mm — controle automático                        ║
+# ║                                                                      ║
+# ║  ❄️  REFRIGERAÇÃO                                                    ║
+# ║  CPU Cooler:     DeepCool AK400 — 4 Heatpipes — 120mm PWM           ║
+# ║  Gabinete:       Montech X3 Mesh — 6x ARGB fans pré-instaladas       ║
+# ║  Fluxo de ar:    Frontal entrada traseira + saída superior/traseira ║
+# ║                                                                      ║
+# ║  🌐 REDE E CONEXÕES EXTERNAS                                        ║
+# ║  Wi-Fi:          Wi-Fi 6E (802.11ax) — 2.4/5/6 GHz — até 5400Mbps   ║
+# ║  Bluetooth:      5.3                                                 ║
+# ║  Ethernet:       2.5 Gigabit — até 2500 Mbps                        ║
+# ║  Portas Traseiras:                                                   ║
+# ║    ✅ 1x HDMI-out / 1x DisplayPort-out (placa-mãe)                   ║
+# ║    ✅ 4x USB-A 3.2 Gen 1 • 2x USB-A 2.0                              ║
+# ║    ✅ 2x USB-C 3.2 Gen 2 • 1x USB-C Thunderbolt 4                    ║
+# ║    ✅ 1x RJ45 2.5G Ethernet • Áudio 3.5mm 7.1 canais                 ║
+# ║  Portas Frontais:                                                    ║
+# ║    ✅ 2x USB-A 3.0 • 1x USB-C 3.2 Gen 2x2 • Áudio/Mic 3.5mm          ║
+# ║                                                                      ║
+# ╚══════════════════════════════════════════════════════════════════╝
+
+set -e
+
+VM_NAME="$VM_NAME"
+CPU_CORES="$CPU_CORES"
+RAM_SIZE="$RAM_SIZE"
+DISK_FILE="$DISK_FILE"
+
+echo ""
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║                🚀 INICIANDO PC VIRTUAL COMPLETO...               ║"
+echo "╠════════════════════════════════════════════════════════════╣"
+echo "║  🖥️  Placa-mãe: ASUS ROG STRIX Z790-A (UEFI)                     ║"
+echo "║  ⚙️  CPU: i7-14700K — $CPU_CORES núcleos / 24 threads             ║"
+echo "║  📝 RAM: $((RAM_SIZE / 1024))GB DDR5 5600MHz Dual Channel         ║"
+echo "║  💾 SSD: 512GB NVMe Kingston KC3000 — 7000/3900 MB/s              ║"
+echo "║  🎮 GPU: RTX 3060 12GB GDDR6 — Ray Tracing + DLSS 3              ║"
+echo "║  🔌 Fonte: MSI MAG 650W 80+ Bronze — Proteção completa           ║"
+echo "║  ❄️  Refrigeração: DeepCool AK400 + Gabinete com 6 fans ARGB      ║"
+echo "║  🌐 Rede: 2.5Gbps + Wi-Fi 6E + Bluetooth 5.3                      ║"
+echo "║  🔊 Áudio: Realtek ALC4080 — 7.1 canais com DAC                  ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""
+
+qemu-system-x86_64 \
+  -name "$VM_NAME" \
+  -machine type=q35,accel=kvm,usb=pcisecure \
+  -cpu host,hv_relaxed,hv_vapic,hv_time,kvm=on,avx2=on,avx512=on \
+  -smp $CPU_CORES,cores=$CPU_CORES,threads=2,sockets=1 \
+  -m $RAM_SIZE,slots=4,maxmem=131072 \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
+  -drive file="$DISK_FILE",if=virtio,format=qcow2,cache=none,aio=native,discard=unmap \
+  -boot menu=on,order=c,uefi=on \
+  -vga none \
+  -device virtio-vga,virgl=on,max_outputs=4 \
+  -device qemu-xhci,p2=15,p3=15 \
+  -device usb-kbd -device usb-tablet \
+  -device usb-host,hostbus=1,hostaddr=3 \
+  -netdev user,id=net0,hostfwd=tcp::3389-:3389,hostfwd=tcp::2222-:22,hostfwd=tcp::8080-:80,hostfwd=tcp::4443-:443 \
+  -device virtio-net-pci,netdev=net0,mac=52:54:00:AB:CD:EF \
+  -device ich9-intel-hda -device hda-duplex,audio=driver,spk=on,mic=on \
+  -rtc base=localtime,driftfix=slew \
+  -balloon virtio,deflate-on-oom=on \
+  -object rng-random,filename=/dev/urandom,id=rng0 \
+  -device virtio-rng-pci,rng=rng0 \
+  -serial mon:stdio \
+  -parallel none \
+  -daemonize
+
+if [ $? -eq 0 ]; then
+  echo ""
+  echo "╔════════════════════════════════════════════════════════════╗"
+  echo "║                    ✅ PC INICIADO COM SUCESSO! 🎉              ║"
+  echo "╠════════════════════════════════════════════════════════════╣"
+  echo "║  🖥️  Área de Trabalho Remota: localhost:3389                   ║"
+  echo "║  🔌 SSH: localhost:2222                                        ║"
+  echo "║  🌐 Web: localhost:8080 / localhost:4443                       ║"
+  echo "║  💡 Para encerrar: pkill -f qemu-system-x86_64                 ║"
+  echo "╚════════════════════════════════════════════════════════════╝"
+else
+  echo "❌ Falha ao iniciar a máquina virtual"
+  exit 1
+fi
+ENDSCRIPT
+
+chmod +x iniciar-pc-completo.sh
+echo "✅ Script criado com sucesso!"
+
+      - name: 📋 Ficha Técnica Completa
+        run: |
+          VM_NAME="${{ github.event.inputs.vm_name || 'Gamer-Station-Virtual' }}"
+          CPU_CORES="${{ github.event.inputs.cpu_cores || '8' }}"
+          RAM_SIZE="${{ github.event.inputs.ram_size || '16384' }}"
+          DISK_FILE="${{ env.DISK_FILE }}"
+          
+          cat > FICHA-TECNICA-COMPLETA.txt << EOF
+╔═══════════════════════════════════════════════════════════════
+║                                                                 ║
+║        🖥️  FICHA TÉCNICA COMPLETA — PC VIRTUAL GAMER           ║
+║                                                                 ║
+╠═══════════════════════════════════════════════════════════════
+║  📌 IDENTIFICAÇÃO                                                ║
+║  Nome do Sistema:  $VM_NAME                                     ║
+║  Data Criação:     $(date "+%d/%m/%Y às %H:%M")                 ║
+║  Arquitetura:      x86_64 — UEFI Secure Boot                    ║
+║  Plataforma:      QEMU/KVM — Virtualização Total                ║
+║                                                                 ║
+╠═══════════════════════════════════════════════════════════════
+║  🧠 PLACA-MÃE — ASUS ROG STRIX Z790-A GAMING WIFI               ║
+║  Chipset:         Intel Z790 Express                             ║
+║  Soquete:         LGA 1700 — Compatível 12ª/13ª/14ª Gen        ║
+║  Formato:         ATX — 305 x 244 mm — 9 furos de fixação       ║
+║  BIOS:            UEFI AMI — Multi-language — Atualizável       ║
+║  Memória RAM:     4 slots DDR5 — Dual Channel — até 128GB       ║
+║  Áudio:           Realtek ALC4080 + DAC ESS SABRE9023P          ║
+║  Rede Principal:  Realtek RTL8125BG — 2.5 Gigabit Ethernet      ║
+║  Wi-Fi/Bluetooth: Intel Wi-Fi 6E AX211 + Bluetooth 5.3         ║
+║  Slots Expansão:  1x PCIe 5.0 x16 (GPU)                         ║
+║                   1x PCIe 4.0 x16 (modo x8)                    ║
+║                   2x PCIe 3.0 x1                                ║
+║  Armazenamento:   4x M.2 NVMe PCIe 4.0 x4                       ║
+║                   6x SATA III 6.0 Gb/s                          ║
+║  Portas Traseiras:                                              ║
+║   • 1x HDMI 2.1, 1x DisplayPort 1.4                            ║
+║   • 2x USB-C Thunderbolt 4 / USB4 40Gbps                       ║
+║   • 2x USB 3.2 Gen 2x2 Type-C                                  ║
+║   • 4x USB-A 3.2 Gen 1, 2x USB-A 2.0                            ║
+║   • 1x RJ45 2.5G, Áudio 3.5mm 7.1 + S/PDIF óptico              ║
+║  Conectores Internos:                                          ║
+║   • 2x USB 3.2 Gen 1 cabeçalho, 2x USB 2.0 cabeçalho           ║
+║   • 1x Conector de painel frontal                               ║
+║   • 3x Endereçável RGB, 2x RGB padrão                          ║
+║   • 4x Conector de ventoinha (pwm)                             ║
+║                                                                 ║
+╠═══════════════════════════════════════════════════════════════
+║  ⚙️  PROCESSADOR — Intel Core i7-14700K                          ║
+║  Família:         Intel Core i7 (Raptor Lake Refresh)          ║
+║  Soquete:         LGA 1700                                      ║
+║  Tecnologia:      Intel 7 (10nm SuperFin)                      ║
+║  Configuração:    8 Núcleos Performance + 8 Núcleos Eficiente  ║
+║                   = 16 Núcleos / 24 Threads lógicos           ║
+║  Frequência Base: 3.4 GHz (P-core) / 2.5 GHz (E-core)          ║
+║  Frequência Turbo:Até 5.4 GHz (1 núcleo)                       ║
+║  Cache L1:        1.12 MB total                                 ║
+║  Cache L2:        20 MB total                                   ║
+║  Cache L3:        33 MB Intel® Smart Cache                      ║
+║  TDP:             125W (Base) / 253W (Turbo)                   ║
+║  Memória Suportada: DDR5 5600MHz / DDR4 3200MHz                ║
+║  Instruções:     MMX, SSE, AVX, AVX2, AVX-512, AES-NI          ║
+║  Segurança:      Intel VT-x, VT-d, SGX, TME, TDX               ║
+║                                                                 ║
+╠═══════════════════════════════════════════════════════════════
+║  📝 MEMÓRIA RAM — Kingston Fury Beast RGB 16GB                  ║
+║  Capacidade:     16 GB (2 × 8 GB)                               ║
+║  Tipo:           DDR5 — 288 pinos — Non-ECC — Unbuffered       ║
+║  Frequência:     5600 MHz — Dual Channel                       ║
+║  Latência:       CL36 (36-38-38-76)                             ║
+║  Tensão:         1.25V                                          ║
+║  Iluminação:     Kingston Fury CTRL RGB — endereçável          ║
+║  Expansão:       2 slots livres — pode chegar a 128GB           ║
+║                                                                 ║
+╠═══════════════════════════════════════════════════════════════
+║  💾 ARMAZENAMENTO — Kingston KC3000 512GB NVMe                  ║
+║  Modelo:         Kingston KC3000 PCIe 4.0 NVMe M.2             ║
+║  Capacidade:     512 GB                                         ║
+║  Interface:      PCI Express Gen 4.0 x4 — NVMe 2.0             ║
+║  Controlador:    Phison PS5018-E18 — 8 canais                  ║
+║  Memória NAND:   Micron 176L 3D TLC                            ║
+║  Cache DRAM:     1 GB onboard — DDR4-2666                      ║
+║  Leitura Seq.:   7000 MB/s                                      ║
+║  Gravação Seq.:  3900 MB/s                                      ║
+║  Leitura 4K:     800,000 IOPS                                   ║
+║  Gravação 4K:    700,000 IOPS                                   ║
+║  Consumo:        7mW (ativo) / 0.5mW (repouso)                  ║
+║  Resistência:    400 TBW — 1.5 milhão horas MTBF               ║
+║  Arquivo VM:     $DISK_FILE                                    ║
+║                                                                 ║
+╠═══════════════════════════════════════════════════════════════
+║  🎮 PLACA DE VÍDEO — NVIDIA GeForce RTX 3060 12GB              ║
+║  Modelo:         NVIDIA RTX 3060 — 12GB GDDR6                 ║
+║  Arquitetura:    NVIDIA Ampere — 2ª Geração                   ║
+║  Litografia:     8 nm Samsung Foundry                           ║
+║  GPU:            GA106-300-A1                                   ║
+║  CUDA Cores:     3584 — 56 SM × 64 CUDA                         ║
+║  Tensor Cores:   112 — 3ª Geração (2x por SM)                  ║
+║  Ray Tracing:    28 — 2ª Geração (1 por SM)                    ║
+║  Frequência Base: 1320 MHz                                      ║
+║  Frequência Boost: 1777 MHz                                     ║
+║  Memória:        12 GB GDDR6 — 192-bit bus                     ║
+║  Banda Larga:    360 GB/s                                       ║
+║  TDP:            170 Watts — refrigeração recomendada 2-slot    ║
+║  Fonte Mínima:   550W + conector 8-pinos PCIe                  ║
+║  Saídas Vídeo:   3× DisplayPort 1.4a • 1× HDMI 2.1             ║
+║  Recursos:       DirectX 12 Ultimate • OpenGL 4.6              ║
+║                  • Ray Tracing nativo                           ║
+║                  • DLSS 3 — IA upscaling                        ║
+║                  • NVIDIA Reflex • Broadcast • Ansel           ║
+║                  • Suporte 4K @ 60Hz ou 1440p @ 144Hz          ║
+║                                                                 ║
+╠═══════════════════════════════════════════════════════════════
+║  🔌 FONTE DE ALIMENTAÇÃO — MSI MAG A650BN                       ║
+║  Potência Nominal: 650 Watts contínua                          ║
+║  Certificação:   80 PLUS Bronze — ≥85% eficiência              ║
+║  Entrada:        AC 100-240V ~ 50/60Hz                          ║
+║  Trilhas Saída:  +3.3V/+5V: 120W Max • +12V: 648W Max         ║
+║  Conectores:     1× 24-pinos (placa-mãe)                       ║
+║                  2× 4+4-pinos (CPU)                             ║
+║                  2× 6+2-pinos (PCIe/GPU)                        ║
+║                  6× SATA • 2× Molex                             ║
+║  Proteções:      OVP (Sobretensão)                              ║
+║                  OCP (Sobrecorrente — cada saída)               ║
+║                  UVP (Subtensão)                                 ║
+║                  OPP (Sobrecarga total)                         ║
+║                  SCP (Curto-circuito)                           ║
+║                  OTP (Sobreaquecimento)                          ║
+║  Ventoinha:      120mm hidráulica — controle térmico automático ║
+║  Modularidade:  Cabo principal fixo, restante semi-modular     ║
+║                                                                 ║
+╠═══════════════════════════════════════════════════════════════
+║  ❄️  SISTEMA DE REFRIGERAÇÃO                                    ║
+║  CPU Cooler:     DeepCool AK400 — Torre única                   ║
+║  Heatpipes:      4 × 6mm — contato direto com CPU               ║
+║  Ventoinha CPU:  120mm PWM — 500~1800 RPM ±10%                 ║
+║  Gabinete:       Montech X3 Mesh — Fluxo de ar máximo          ║
+║  Ventoinhas Gab: 6 × 120mm ARGB pré-instaladas                 ║
+║                   3x Frontal (entrada)                          ║
+║                   2x Topo + 1x Traseira (saída)                 ║
+║  Fluxo de Ar:    Pressão positiva — ar entra > sai              ║
+║  Temperatura:    CPU Idle: 35-40°C • Carga: 65-75°C            ║
+║                    
